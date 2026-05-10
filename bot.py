@@ -1,32 +1,61 @@
+# =========================================
+# 2D CALCULATOR TELEGRAM BOT
+# =========================================
+
 import re
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
-    ContextTypes,
     MessageHandler,
+    ContextTypes,
     filters
 )
 
 # =========================================
-# BOT TOKEN
+# TOKEN
 # =========================================
 
 TOKEN = "8543212797:AAFMPikuXIga7d3YvpL8avOA8XkTk0C4S0o"
 
 # =========================================
-# 2D NAME
+# 2D NAME LIST
 # =========================================
 
 TWO_D_NAMES = {
-    "Dubai": ["du", "dubai", "ဒူ", "ဒူဘိုင်း"],
-    "Mega": ["me", "mega", "မီ", "မီဂါ"],
-    "Maxi": ["maxi", "max", "မက်ဆီ", "မက်စီ", "စီစီ"],
-    "Global": ["glo", "global", "ဂလို"],
-    "London": ["landon", "london", "လန်လန်", "လန်ဒန်", "ld"],
-    "Lao": ["lao", "loa", "loadon", "laodon", "လာလာ", "လာအို", "laos", "loas"],
-    "Mm": ["mm"]
-}
+    "Dubai": [
+        "du", "dubai", "ဒူ", "ဒူဘိုင်း"
+    ],
 
+    "Mega": [
+        "me", "mega", "မီ", "မီဂါ"
+    ],
+
+    "Maxi": [
+        "maxi", "max",
+        "မက်ဆီ", "မက်စီ", "စီစီ"
+    ],
+
+    "Global": [
+        "glo", "global", "ဂလို"
+    ],
+
+    "London": [
+        "landon", "london",
+        "လန်လန်", "လန်ဒန်",
+        "ld"
+    ],
+
+    "Lao": [
+        "lao", "loa",
+        "loadon", "laodon",
+        "လာလာ", "လာအို",
+        "laos", "loas"
+    ],
+
+    "Mm": [
+        "mm"
+    ]
+}
 
 # =========================================
 # GET 2D NAME
@@ -45,7 +74,6 @@ def get_2d_name(text):
 
     return "2D"
 
-
 # =========================================
 # NORMALIZE
 # =========================================
@@ -54,7 +82,6 @@ def normalize(text):
 
     text = text.lower()
 
-    # separator
     text = text.replace("*", " ")
     text = text.replace("/", " ")
     text = text.replace("-", " ")
@@ -64,9 +91,8 @@ def normalize(text):
 
     return text.strip()
 
-
 # =========================================
-# GET DEFAULT AMOUNT
+# DEFAULT AMOUNT
 # =========================================
 
 def get_default_amount(lines):
@@ -76,21 +102,23 @@ def get_default_amount(lines):
         nums = re.findall(r"\d+", line)
 
         if nums:
-            return int(nums[-1])
 
-    return 0
+            last_num = int(nums[-1])
 
+            if last_num >= 10:
+                return last_num
+
+    return 100
 
 # =========================================
-# COUNT DIRECT NUMBERS
+# 2D NUMBER COUNT
 # =========================================
 
-def count_direct_numbers(line):
+def count_2d(line):
 
     nums = re.findall(r"\b\d{2}\b", line)
 
     return len(nums)
-
 
 # =========================================
 # MAIN CALCULATOR
@@ -101,19 +129,24 @@ def calculate_line(line, default_amount):
     original = line
     line = normalize(line)
 
-    # -------------------------------------
-    # amount
-    # -------------------------------------
-
     amount = default_amount
+
+    total_box = 0
+
+    # =====================================
+    # R AMOUNT
+    # =====================================
 
     r_amount = None
 
-    # 23 45 56=500R250
     r_match = re.search(r"r\s*(\d+)", original.lower())
 
     if r_match:
         r_amount = int(r_match.group(1))
+
+    # =====================================
+    # NORMAL AMOUNT
+    # =====================================
 
     nums = re.findall(r"\d+", original)
 
@@ -121,18 +154,19 @@ def calculate_line(line, default_amount):
 
         last_num = int(nums[-1])
 
-        # amount detect
         if last_num >= 10:
             amount = last_num
 
-    # -------------------------------------
-    # keywords
-    # -------------------------------------
+    # =====================================
+    # DIGIT COUNT
+    # =====================================
 
-    total_boxes = 0
+    digits = re.findall(r"\d", line)
+
+    digit_count = len(digits)
 
     # =====================================
-    # 1. ပတ်ပူး / 20
+    # ပတ်ပူး
     # =====================================
 
     if any(x in line for x in [
@@ -146,12 +180,10 @@ def calculate_line(line, default_amount):
         "ထိပ်နောက်"
     ]):
 
-        digits = re.findall(r"\d", line)
-
-        total_boxes += len(digits) * 20
+        total_box += digit_count * 20
 
     # =====================================
-    # 2. ပတ် / 19
+    # ပတ်
     # =====================================
 
     elif any(x in line for x in [
@@ -162,12 +194,10 @@ def calculate_line(line, default_amount):
         "p"
     ]):
 
-        digits = re.findall(r"\d", line)
-
-        total_boxes += len(digits) * 19
+        total_box += digit_count * 19
 
     # =====================================
-    # 3. ထိပ် / ပိတ်
+    # ထိပ်
     # =====================================
 
     elif any(x in line for x in [
@@ -178,9 +208,11 @@ def calculate_line(line, default_amount):
         "t"
     ]):
 
-        digits = re.findall(r"\d", line)
+        total_box += digit_count * 10
 
-        total_boxes += len(digits) * 10
+    # =====================================
+    # ပိတ်
+    # =====================================
 
     elif any(x in line for x in [
         "ပိတ်",
@@ -190,12 +222,10 @@ def calculate_line(line, default_amount):
         "ပ"
     ]):
 
-        digits = re.findall(r"\d", line)
-
-        total_boxes += len(digits) * 10
+        total_box += digit_count * 10
 
     # =====================================
-    # 4. စုံဘရိတ်
+    # စုံဘရိတ်
     # =====================================
 
     elif any(x in line for x in [
@@ -207,10 +237,10 @@ def calculate_line(line, default_amount):
         "စဘရိတ်"
     ]):
 
-        total_boxes += 50
+        total_box += 50
 
     # =====================================
-    # 5. ဘရိတ်
+    # ဘရိတ်
     # =====================================
 
     elif any(x in line for x in [
@@ -218,12 +248,10 @@ def calculate_line(line, default_amount):
         "bk"
     ]):
 
-        digits = re.findall(r"\d", line)
-
-        total_boxes += len(digits) * 10
+        total_box += digit_count * 10
 
     # =====================================
-    # 6. ခွေပူး
+    # ခွေပူး
     # =====================================
 
     elif any(x in line for x in [
@@ -233,14 +261,14 @@ def calculate_line(line, default_amount):
         "အပူးအပြီးပါ"
     ]):
 
-        digits = "".join(re.findall(r"\d", line))
+        pure_digits = "".join(re.findall(r"\d", line))
 
-        n = len(digits)
+        n = len(pure_digits)
 
-        total_boxes += n * n
+        total_box += n * n
 
     # =====================================
-    # 7. ခွေ
+    # ခွေ
     # =====================================
 
     elif any(x in line for x in [
@@ -249,14 +277,14 @@ def calculate_line(line, default_amount):
         "ခ"
     ]):
 
-        digits = "".join(re.findall(r"\d", line))
+        pure_digits = "".join(re.findall(r"\d", line))
 
-        n = len(digits)
+        n = len(pure_digits)
 
-        total_boxes += n * (n - 1)
+        total_box += n * (n - 1)
 
     # =====================================
-    # 8. ဆယ်ပြည့်
+    # ဆယ်ပြည့်
     # =====================================
 
     elif any(x in line for x in [
@@ -265,10 +293,10 @@ def calculate_line(line, default_amount):
         "ဆယ့်ပြည်"
     ]):
 
-        total_boxes += 10
+        total_box += 10
 
     # =====================================
-    # 9. စုံပူး / မပူး
+    # စုံပူး
     # =====================================
 
     elif any(x in line for x in [
@@ -276,10 +304,10 @@ def calculate_line(line, default_amount):
         "မပူး"
     ]):
 
-        total_boxes += 5
+        total_box += 5
 
     # =====================================
-    # 10. အပူး
+    # အပူး
     # =====================================
 
     elif any(x in line for x in [
@@ -287,10 +315,10 @@ def calculate_line(line, default_amount):
         "ပူး"
     ]):
 
-        total_boxes += 10
+        total_box += 10
 
     # =====================================
-    # 11. စမ
+    # စမ
     # =====================================
 
     elif any(x in line for x in [
@@ -305,13 +333,13 @@ def calculate_line(line, default_amount):
         "စုံစူံ"
     ]):
 
-        total_boxes += 25
+        total_box += 25
 
         if "r" in line:
-            total_boxes *= 2
+            total_box *= 2
 
     # =====================================
-    # 12. ကပ်
+    # ကပ်
     # =====================================
 
     elif "ကပ်" in line or "ကို" in line:
@@ -323,13 +351,13 @@ def calculate_line(line, default_amount):
             a = len(parts[0])
             b = len(parts[1])
 
-            total_boxes += a * b
+            total_box += a * b
 
             if "r" in line:
-                total_boxes *= 2
+                total_box *= 2
 
     # =====================================
-    # 13. ပါဝါ
+    # ပါဝါ
     # =====================================
 
     if any(x in line for x in [
@@ -339,10 +367,10 @@ def calculate_line(line, default_amount):
         "power"
     ]):
 
-        total_boxes += 10
+        total_box += 10
 
     # =====================================
-    # 14. နက္ခတ်
+    # နက္ခတ်
     # =====================================
 
     if any(x in line for x in [
@@ -352,10 +380,10 @@ def calculate_line(line, default_amount):
         "နခ"
     ]):
 
-        total_boxes += 10
+        total_box += 10
 
     # =====================================
-    # 15. ညီကို
+    # ညီကို
     # =====================================
 
     if any(x in line for x in [
@@ -364,43 +392,48 @@ def calculate_line(line, default_amount):
         "ညီအစ်ကို"
     ]):
 
-        total_boxes += 20
+        total_box += 20
 
     # =====================================
-    # 16. DIRECT / R
+    # DIRECT / R
     # =====================================
 
-    if total_boxes == 0:
+    if total_box == 0:
 
-        direct_count = count_direct_numbers(original)
+        direct_count = count_2d(original)
 
         # 23 45 56=500R250
+
         if r_amount:
 
-            normal_amount_match = re.search(
+            normal_amount = amount
+
+            normal_match = re.search(
                 r"[=\s](\d+)\s*r",
                 original.lower()
             )
 
-            if normal_amount_match:
+            if normal_match:
 
                 normal_amount = int(
-                    normal_amount_match.group(1)
+                    normal_match.group(1)
                 )
 
-            else:
-                normal_amount = amount
-
-            return (
+            total = (
                 direct_count * normal_amount
             ) + (
                 direct_count * r_amount
             )
 
-        # 12r500
+            return total
+
+        # 12R500
+
         elif "r" in line:
 
             return direct_count * amount * 2
+
+        # direct
 
         else:
 
@@ -410,8 +443,7 @@ def calculate_line(line, default_amount):
     # FINAL
     # =====================================
 
-    return total_boxes * amount
-
+    return total_box * amount
 
 # =========================================
 # HANDLE MESSAGE
@@ -436,13 +468,13 @@ async def handle_message(
 
     default_amount = get_default_amount(lines)
 
-    total = 0
+    grand_total = 0
 
     for line in lines:
 
         try:
 
-            total += calculate_line(
+            grand_total += calculate_line(
                 line,
                 default_amount
             )
@@ -457,12 +489,12 @@ async def handle_message(
     # REPLY
     # =====================================
 
-    if total > 0:
+    if grand_total > 0:
 
         reply = (
-            f"👤 {username}\n"
-            f"--------------------\n"
-            f"{two_d_name} စုစုပေါင်း = {total:,} ကျပ်\n"
+            f"👤 {username}\n\n"
+            f"{two_d_name} စုစုပေါင်း = "
+            f"{grand_total:,} ကျပ်\n"
             f"ကံကောင်းပါစေရှင့်"
         )
 
@@ -470,7 +502,6 @@ async def handle_message(
             reply,
             reply_to_message_id=update.message.message_id
         )
-
 
 # =========================================
 # MAIN
