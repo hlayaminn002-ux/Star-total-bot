@@ -4,59 +4,43 @@ from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
     MessageHandler,
-    filters,
+    filters
 )
 
 # =========================================
-# CONFIG
+# BOT TOKEN
 # =========================================
 
-TOKEN = "8543212797:AAFMPikuXIga7d3YvpL8avOA8XkTk0C4S0o"
+TOKEN = "YOUR_BOT_TOKEN"
 
 # =========================================
 # 2D NAME
 # =========================================
 
 TWO_D_NAMES = {
-    "Dubai": [
-        "du", "dubai", "ဒူ", "ဒူဘိုင်း"
-    ],
-
-    "Mega": [
-        "me", "mega", "မီ", "မီဂါ"
-    ],
-
-    "Maxi": [
-        "maxi", "max", "မက်ဆီ", "မက်စီ", "စီစီ"
-    ],
-
-    "Global": [
-        "glo", "global", "ဂလို"
-    ],
-
-    "London": [
-        "landon", "london", "လန်လန်",
-        "လန်ဒန်", "ld"
-    ],
-
-    "Lao": [
-        "lao", "loa", "loadon",
-        "laodon", "လာလာ", "လာအို",
-        "laos", "loas"
-    ],
-
-    "Mm": [
-        "mm"
-    ]
+    "Dubai": ["du", "dubai", "ဒူ", "ဒူဘိုင်း"],
+    "Mega": ["me", "mega", "မီ", "မီဂါ"],
+    "Maxi": ["maxi", "max", "မက်ဆီ", "မက်စီ", "စီစီ"],
+    "Global": ["glo", "global", "ဂလို"],
+    "London": ["landon", "london", "လန်လန်", "လန်ဒန်", "ld"],
+    "Lao": ["lao", "loa", "loadon", "laodon", "လာလာ", "လာအို", "laos", "loas"],
+    "Mm": ["mm"]
 }
 
 
+# =========================================
+# GET 2D NAME
+# =========================================
+
 def get_2d_name(text):
+
     text = text.lower()
 
-    for name, keywords in TWO_D_NAMES.items():
-        for kw in keywords:
-            if kw.lower() in text:
+    for name, keys in TWO_D_NAMES.items():
+
+        for key in keys:
+
+            if key.lower() in text:
                 return name
 
     return "2D"
@@ -66,13 +50,15 @@ def get_2d_name(text):
 # NORMALIZE
 # =========================================
 
-def normalize_text(text):
+def normalize(text):
 
     text = text.lower()
 
-    separators = ["*", "/", "=", "-", ","]
-    for s in separators:
-        text = text.replace(s, " ")
+    # separator
+    text = text.replace("*", " ")
+    text = text.replace("/", " ")
+    text = text.replace("-", " ")
+    text = text.replace("=", " ")
 
     text = re.sub(r"\s+", " ", text)
 
@@ -80,33 +66,30 @@ def normalize_text(text):
 
 
 # =========================================
-# EXTRACT AMOUNT
+# GET DEFAULT AMOUNT
 # =========================================
 
-def extract_amount(line):
+def get_default_amount(lines):
 
-    # R amount
-    r_match = re.search(r"[rအာ](\d+)", line.lower())
-    r_amount = int(r_match.group(1)) if r_match else None
+    for line in reversed(lines):
 
-    # normal amount
-    all_nums = re.findall(r"\d+", line)
+        nums = re.findall(r"\d+", line)
 
-    amount = None
+        if nums:
+            return int(nums[-1])
 
-    if all_nums:
-        amount = int(all_nums[-1])
-
-    return amount, r_amount
+    return 0
 
 
 # =========================================
-# COUNT 2D NUMBERS
+# COUNT DIRECT NUMBERS
 # =========================================
 
-def get_2d_numbers(line):
+def count_direct_numbers(line):
 
-    return re.findall(r"\b\d{2}\b", line)
+    nums = re.findall(r"\b\d{2}\b", line)
+
+    return len(nums)
 
 
 # =========================================
@@ -116,91 +99,106 @@ def get_2d_numbers(line):
 def calculate_line(line, default_amount):
 
     original = line
-    line = normalize_text(line)
+    line = normalize(line)
 
-    total = 0
+    # -------------------------------------
+    # amount
+    # -------------------------------------
 
-    amount, r_amount = extract_amount(original)
+    amount = default_amount
 
-    if not amount:
-        amount = default_amount
+    r_amount = None
 
-    if not amount:
-        amount = 0
+    # 23 45 56=500R250
+    r_match = re.search(r"r\s*(\d+)", original.lower())
 
-    # =====================================
-    # DIGIT COUNT
-    # =====================================
+    if r_match:
+        r_amount = int(r_match.group(1))
 
-    digit_groups = re.findall(r"\d+", line)
+    nums = re.findall(r"\d+", original)
+
+    if nums:
+
+        last_num = int(nums[-1])
+
+        # amount detect
+        if last_num >= 10:
+            amount = last_num
+
+    # -------------------------------------
+    # keywords
+    # -------------------------------------
+
+    total_boxes = 0
 
     # =====================================
     # 1. ပတ်ပူး / 20
     # =====================================
 
     if any(x in line for x in [
-        "ပတ်ပူး", "ပူးပို", "ပတ်အကွက်20",
-        "ထန", "ထပ", "ထိပ်ပိတ်",
+        "ပတ်ပူး",
+        "ပူးပို",
+        "ပတ်ပူးပို",
+        "ပတ်အကွက်20",
+        "ထန",
+        "ထပ",
+        "ထိပ်ပိတ်",
         "ထိပ်နောက်"
     ]):
 
-        count = 0
+        digits = re.findall(r"\d", line)
 
-        for d in digit_groups:
-            count += len(d)
-
-        return count * 20 * amount
+        total_boxes += len(digits) * 20
 
     # =====================================
     # 2. ပတ် / 19
     # =====================================
 
-    if any(x in line for x in [
-        "ပတ်", "အပါ", "ပါ", "ch", "p"
+    elif any(x in line for x in [
+        "ပတ်",
+        "အပါ",
+        "ပါ",
+        "ch",
+        "p"
     ]):
 
-        count = 0
+        digits = re.findall(r"\d", line)
 
-        for d in digit_groups:
-            count += len(d)
-
-        return count * 19 * amount
+        total_boxes += len(digits) * 19
 
     # =====================================
-    # 3. ထိပ် / TOP
+    # 3. ထိပ် / ပိတ်
     # =====================================
 
-    if any(x in line for x in [
-        "ထိပ်", "ထိပ်စီး", "top", "t"
+    elif any(x in line for x in [
+        "ထိပ်",
+        "ထိပ်စီး",
+        "ထ",
+        "top",
+        "t"
     ]):
 
-        count = 0
+        digits = re.findall(r"\d", line)
 
-        for d in digit_groups:
-            count += len(d)
+        total_boxes += len(digits) * 10
 
-        return count * 10 * amount
-
-    # =====================================
-    # 4. ပိတ်
-    # =====================================
-
-    if any(x in line for x in [
-        "ပိတ်", "အပိတ်", "နောက်", "န", "ပ"
+    elif any(x in line for x in [
+        "ပိတ်",
+        "အပိတ်",
+        "နောက်",
+        "န",
+        "ပ"
     ]):
 
-        count = 0
+        digits = re.findall(r"\d", line)
 
-        for d in digit_groups:
-            count += len(d)
-
-        return count * 10 * amount
+        total_boxes += len(digits) * 10
 
     # =====================================
-    # 5. စုံဘရိတ်
+    # 4. စုံဘရိတ်
     # =====================================
 
-    if any(x in line for x in [
+    elif any(x in line for x in [
         "စုံဘရိတ်",
         "စုံbk",
         "မbk",
@@ -209,115 +207,114 @@ def calculate_line(line, default_amount):
         "စဘရိတ်"
     ]):
 
-        return 50 * amount
+        total_boxes += 50
 
     # =====================================
-    # 6. ဘရိတ်
+    # 5. ဘရိတ်
     # =====================================
 
-    if any(x in line for x in [
-        "ဘရိတ်", "bk"
+    elif any(x in line for x in [
+        "ဘရိတ်",
+        "bk"
     ]):
 
-        count = len(digit_groups)
+        digits = re.findall(r"\d", line)
 
-        if count == 0:
-            count = 1
-
-        return count * 10 * amount
+        total_boxes += len(digits) * 10
 
     # =====================================
-    # 7. ခွေ ပူး
+    # 6. ခွေပူး
     # =====================================
 
-    if any(x in line for x in [
+    elif any(x in line for x in [
         "ခွေပူး",
         "အခွေပူး",
         "အပူးပါ",
         "အပူးအပြီးပါ"
     ]):
 
-        nums = "".join(digit_groups)
+        digits = "".join(re.findall(r"\d", line))
 
-        n = len(nums)
+        n = len(digits)
 
-        return (n * n) * amount
+        total_boxes += n * n
 
     # =====================================
-    # 8. ခွေ
+    # 7. ခွေ
     # =====================================
 
-    if any(x in line for x in [
-        "ခွေ", "အခွေ", "ခ"
+    elif any(x in line for x in [
+        "ခွေ",
+        "အခွေ",
+        "ခ"
     ]):
 
-        nums = "".join(digit_groups)
+        digits = "".join(re.findall(r"\d", line))
 
-        n = len(nums)
+        n = len(digits)
 
-        return (n * (n - 1)) * amount
+        total_boxes += n * (n - 1)
 
     # =====================================
-    # 9. ဆယ်ပြည့်
+    # 8. ဆယ်ပြည့်
     # =====================================
 
-    if any(x in line for x in [
+    elif any(x in line for x in [
         "ဆယ်ပြည့်",
         "ဆယ်ပြည်",
         "ဆယ့်ပြည်"
     ]):
 
-        return 10 * amount
+        total_boxes += 10
 
     # =====================================
-    # 10. စုံပူး / မပူး
+    # 9. စုံပူး / မပူး
     # =====================================
 
-    if any(x in line for x in [
+    elif any(x in line for x in [
         "စုံပူး",
         "မပူး"
     ]):
 
-        return 5 * amount
+        total_boxes += 5
 
     # =====================================
-    # 11. အပူး
+    # 10. အပူး
     # =====================================
 
-    if any(x in line for x in [
+    elif any(x in line for x in [
         "အပူး",
         "ပူး"
     ]):
 
-        return 10 * amount
+        total_boxes += 10
 
     # =====================================
-    # 12. စမ
+    # 11. စမ
     # =====================================
 
-    if any(x in line for x in [
+    elif any(x in line for x in [
         "စစ",
         "မမ",
         "စမ",
         "မစ",
         "စုံစုံ",
         "စုံမ",
-        "စုံစူံ",
-        "စူံစုံ"
+        "စုူံစူံ",
+        "စူံစုံ",
+        "စုံစူံ"
     ]):
 
-        result = 25 * amount
+        total_boxes += 25
 
         if "r" in line:
-            result *= 2
-
-        return result
+            total_boxes *= 2
 
     # =====================================
-    # 13. ကပ်
+    # 12. ကပ်
     # =====================================
 
-    if "ကပ်" in line or "ကို" in line:
+    elif "ကပ်" in line or "ကို" in line:
 
         parts = re.findall(r"\d+", line)
 
@@ -326,35 +323,39 @@ def calculate_line(line, default_amount):
             a = len(parts[0])
             b = len(parts[1])
 
-            result = a * b * amount
+            total_boxes += a * b
 
             if "r" in line:
-                result *= 2
-
-            return result
+                total_boxes *= 2
 
     # =====================================
-    # 14. ပါဝါ
+    # 13. ပါဝါ
     # =====================================
 
     if any(x in line for x in [
-        "ပါဝါ", "ပဝ", "pw", "power"
+        "ပါဝါ",
+        "ပဝ",
+        "pw",
+        "power"
     ]):
 
-        return 10 * amount
+        total_boxes += 10
 
     # =====================================
-    # 15. နက္ခတ်
+    # 14. နက္ခတ်
     # =====================================
 
     if any(x in line for x in [
-        "နက္ခတ်", "nk", "နက", "နခ"
+        "နက္ခတ်",
+        "nk",
+        "နက",
+        "နခ"
     ]):
 
-        return 10 * amount
+        total_boxes += 10
 
     # =====================================
-    # 16. ညီကို
+    # 15. ညီကို
     # =====================================
 
     if any(x in line for x in [
@@ -363,46 +364,57 @@ def calculate_line(line, default_amount):
         "ညီအစ်ကို"
     ]):
 
-        return 20 * amount
+        total_boxes += 20
 
     # =====================================
-    # 17. ဒဲ့ / R
+    # 16. DIRECT / R
     # =====================================
 
-    numbers = get_2d_numbers(original)
+    if total_boxes == 0:
 
-    if numbers:
+        direct_count = count_direct_numbers(original)
 
+        # 23 45 56=500R250
         if r_amount:
 
-            main_amount_match = re.search(
-                r"=(\d+)",
-                original
+            normal_amount_match = re.search(
+                r"[=\s](\d+)\s*r",
+                original.lower()
             )
 
-            if main_amount_match:
-                main_amount = int(main_amount_match.group(1))
+            if normal_amount_match:
+
+                normal_amount = int(
+                    normal_amount_match.group(1)
+                )
+
             else:
-                main_amount = amount
+                normal_amount = amount
 
-            total += len(numbers) * main_amount
-            total += len(numbers) * r_amount
+            return (
+                direct_count * normal_amount
+            ) + (
+                direct_count * r_amount
+            )
 
-            return total
-
+        # 12r500
         elif "r" in line:
 
-            return len(numbers) * amount * 2
+            return direct_count * amount * 2
 
         else:
 
-            return len(numbers) * amount
+            return direct_count * amount
 
-    return 0
+    # =====================================
+    # FINAL
+    # =====================================
+
+    return total_boxes * amount
 
 
 # =========================================
-# TELEGRAM
+# HANDLE MESSAGE
 # =========================================
 
 async def handle_message(
@@ -422,40 +434,22 @@ async def handle_message(
 
     lines = text.split("\n")
 
-    # =====================================
-    # DEFAULT AMOUNT
-    # =====================================
+    default_amount = get_default_amount(lines)
 
-    default_amount = 0
-
-    for line in reversed(lines):
-
-        nums = re.findall(r"\d+", line)
-
-        if nums:
-            default_amount = int(nums[-1])
-            break
-
-    # =====================================
-    # TOTAL
-    # =====================================
-
-    grand_total = 0
+    total = 0
 
     for line in lines:
 
         try:
-            grand_total += calculate_line(
+
+            total += calculate_line(
                 line,
                 default_amount
             )
 
         except Exception as e:
-            print("ERROR :", e)
 
-    # =====================================
-    # 2D NAME
-    # =====================================
+            print("ERROR :", e)
 
     two_d_name = get_2d_name(text)
 
@@ -463,15 +457,13 @@ async def handle_message(
     # REPLY
     # =====================================
 
-    if grand_total > 0:
+    if total > 0:
 
         reply = (
             f"👤 {username}\n"
             f"--------------------\n"
-            f"{two_d_name} Total =\n"
-            f"--------------------\n"
-            f"လွဲရမည့်ငွေ = {grand_total:,} ကျပ် ဘဲ လွဲပါရှင့်\n"
-            f"ကံကောင်းပါစေ နော်"
+            f"{two_d_name} စုစုပေါင်း = {total:,} ကျပ်\n"
+            f"ကံကောင်းပါစေရှင့်"
         )
 
         await update.message.reply_text(
