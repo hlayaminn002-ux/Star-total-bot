@@ -49,7 +49,6 @@ def calculate_line_logic(line, default_amount):
         nums = re.findall(r'\d', clean_line)
         total_spots += len(nums) * 20
 
-    # 3. ထိပ်စီး (၁၀ ကွက်)
     if any(x in clean_line for x in ['ထိပ်', 'top', 'ထိပ်စီး']):
 
     target = clean_line
