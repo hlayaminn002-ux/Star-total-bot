@@ -128,22 +128,36 @@ def calculate_line_logic(line, default_amount):
     
     digits = re.findall(r'\b\d{2}\b', temp_text)
     
-    # R တွက်နည်း (ဒဲ့ + R ခွဲတွက်တာအပါအဝင်)
-    if 'r' in clean_line or 'အာ' in clean_line:
+        # --- R နှင့် ဒဲ့ဂဏန်းများ တွက်ချက်ခြင်း Logic အသစ် ---
+    
+    # ၁။ ဒဲ့ + R ခွဲတွက်တာ (ဥပမာ- 23 45=500R250)
+    if 'r' in clean_line and any(c.isdigit() for c in clean_line.split('r')[-1]):
+        r_parts = clean_line.split('r')
+        # ရှေ့ပိုင်းက ဒဲ့ဖိုးကို ရှာသည်
+        main_amt_match = re.search(r'(\d+)', r_parts[0])
+        main_amt = int(main_amt_match.group(1)) if main_amt_match else line_amount
+        # နောက်ပိုင်းက R ဖိုးကို ရှာသည်
+        r_amt_match = re.search(r'(\d+)', r_parts[1])
+        r_amt = int(r_amt_match.group(1)) if r_amt_match else main_amt
+        
+        return (len(digits) * main_amt) + (len(digits) * r_amt)
+
+    # ၂။ သာမန် R (ဥပမာ- 12r 500 သို့မဟုတ် 12 45 r 500)
+    elif 'r' in clean_line or 'အာ' in clean_line:
         if digits:
-            if 'r' in clean_line and any(c.isdigit() for c in clean_line.split('r')[-1]):
-                r_parts = clean_line.split('r')
-                main_amt = extract_amount(r_parts[0]) or line_amount
-                r_amt = extract_amount(r_parts[1])
-                return (len(digits) * main_amt) + (len(digits) * r_amt)
-            else:
-                total_spots += len(digits) * 2
+            # ဂဏန်းအတွဲရှိရင် အကွက်အရေအတွက်ကို ၂ ဆမြှောက် (ဒဲ့ + အာ)
+            total_spots += len(digits) * 2
         else:
-            total_spots *= 2 # Keyword တွေအတွက် R ပါရင် ၂ ဆ
+            # Keyword တွေပဲရှိရင် (ဥပမာ- စမ R) ရှိပြီးသား total_spots ကို ၂ ဆမြှောက်
+            total_spots *= 2
+    
+    # ၃။ R လုံးဝမပါတဲ့ ဒဲ့သီးသန့်
     else:
         total_spots += len(digits)
 
+    # နောက်ဆုံး ရလာတဲ့ အကွက်စုစုပေါင်းကို ငွေဖိုးနဲ့မြှောက်
     return total_spots * line_amount
+
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
