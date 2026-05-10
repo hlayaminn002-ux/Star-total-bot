@@ -50,9 +50,19 @@ def calculate_line_logic(line, default_amount):
         total_spots += len(nums) * 20
 
     # 3. ထိပ်စီး (၁၀ ကွက်)
-    elif any(x in clean_line for x in ['ထိပ်', 'top', 't']):
-        nums = re.findall(r'\d', clean_line)
-        total_spots += len(nums) * 10
+    if any(x in clean_line for x in ['ထိပ်', 'top', 'ထိပ်စီး']):
+
+    target = clean_line
+
+    if 'ထိပ်' in clean_line:
+        target = clean_line.split('ထိပ်')[0]
+
+    elif 'top' in clean_line:
+        target = clean_line.split('top')[0]
+
+    nums = re.findall(r'\d', target)
+
+    total_spots += len(nums) * 10
 
     # 4. အပိတ်/နောက် (၁၀ ကွက်)
     elif any(x in clean_line for x in ['ပိတ်', 'အပိတ်', 'နောက်', 'န', 'ပ']):
