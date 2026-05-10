@@ -40,9 +40,27 @@ def calculate_line_logic(line, default_amount):
     total_spots = 0
     
     # 1. ပတ်သီး (၁၉ ကွက်)
-    if any(x in clean_line for x in ['ပတ်', 'အပါ', 'ပါ', 'ch', 'p']) and 'ပူးပို' not in clean_line and 'အပူးပို' not in clean_line:
-        nums = re.findall(r'\d', clean_line.split('ပတ်')[0] if 'ပတ်' in clean_line else clean_line)
-        total_spots += len(nums) * 19
+
+if (
+    any(x in clean_line for x in ['ပတ်', 'အပါ', 'ပါ', 'ch'])
+    and 'ပူးပို' not in clean_line
+    and 'အပူးပို' not in clean_line
+):
+
+    target = clean_line
+
+    if 'ပတ်' in clean_line:
+        target = clean_line.split('ပတ်')[0]
+
+    elif 'အပါ' in clean_line:
+        target = clean_line.split('အပါ')[0]
+
+    elif re.search(r'\bp\b', clean_line):  
+        target = re.split(r'\bp\b', clean_line)[0]
+
+    nums = re.findall(r'\d', target)
+
+    total_spots += len(nums) * 19
         
     # 2. ပတ်ပူး / ၂၀ကွက်
     elif any(x in clean_line for x in ['ပတ်ပူး', 'ပူးပို', 'ပတ်ပူးပို', '၂၀ကွက်', 'ထန', 'ထပ', 'ထိပ်ပိတ်', 'ထိပ်နောက်']):
