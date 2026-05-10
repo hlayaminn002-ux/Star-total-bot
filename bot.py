@@ -11,7 +11,7 @@ from telegram.ext import (
 # BOT TOKEN
 # =========================================
 
-TOKEN = "YOUR_BOT_TOKEN"
+TOKEN = "8543212797:AAFMPikuXIga7d3YvpL8avOA8XkTk0C4S0o"
 
 # =========================================
 # 2D NAME
