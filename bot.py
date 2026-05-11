@@ -3,18 +3,16 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
 # --- CONFIGURATION ---
-TOKEN = "8543212797:AAFMPikuXIga7d3YvpL8avOA8XkTk0C4S0o"
+TOKEN = "YOUR_BOT_TOKEN_HERE" # လူကြီးမင်း၏ Token ထည့်ပါ
 
-# --- HELPER FUNCTIONS ---
 def get_2d_name(text):
-    # နာမည်များကို အရင်ရှာပြီး တွက်ချက်မှုထဲမပါအောင် ဖယ်ထုတ်ရန်
     names = {
         'Dubai': ['dubai', 'du', 'ဒူဘိုင်း', 'ဒူ'],
         'Mega': ['mega', 'me', 'မီဂါ', 'မီ'],
         'Maxi': ['maxi', 'max', 'မက်ဆီ', 'မက်စီ', 'စီစီ'],
         'Global': ['global', 'glo', 'ဂလို'],
-        'London': ['london', 'landon', 'လန်ဒန်', 'လန်လန်', 'ld'],
-        'Lao': ['lao', 'laos', 'loa', 'လာအို', 'လာလာ', 'loadon'],
+        'London': ['london', 'landon', 'လန်ဒန်', 'ld'],
+        'Lao': ['lao', 'laos', 'လာအို', 'လာလာ'],
         'Mm': ['mm']
     }
     text_lower = text.lower()
@@ -24,139 +22,125 @@ def get_2d_name(text):
     return "2D", []
 
 def extract_amount(line):
-    # စာကြောင်းရဲ့ အဆုံးမှာပါတဲ့ amount ကို ရှာခြင်း
+    # စာကြောင်းအဆုံးမှ amount ကို ရှာသည်
     match = re.search(r'(\d+)\s*$', line.strip())
     return int(match.group(1)) if match else None
 
 def calculate_line_logic(line, default_amount):
-    # စာသားသန့်စင်ခြင်း (သင်္ကေတများကို space ပြောင်းသည်)
-    line = line.lower()
-    clean_line = re.sub(r'[-=*+/]', ' ', line)
+    line = line.lower().strip()
+    if not line: return 0
     
+    # % နုတ်တဲ့စာကြောင်းဆိုရင် ကျော်သွားမယ် (grand_total ထဲမပေါင်းရန်)
+    if '%' in line: return 0
+
+    # Amount ခွဲထုတ်ခြင်း
     amount = extract_amount(line) or default_amount
     if not amount: return 0
 
-    total_spots = 0
+    # Amount ကို ဖယ်ပြီး ကျန်တဲ့စာသားကိုပဲ Logic စစ်မယ်
+    clean_line = re.sub(r'\d+\s*$', '', line).strip()
     
-    # ၁။ ပတ်ပူး / ၂၀ကွက် (၂၀ ကွက်တွက်နည်း)
-    pb_kws = ['ပတ်ပူး', 'ပူးပို', 'ပတ်ပူးပို', 'ပတ်အကွက်20', 'ထန', 'ထပ', 'ထိပ်ပိတ်', 'ထိပ်နောက်']
-    for kw in pb_kws:
-        if kw in clean_line:
-            nums = re.findall(r'\d', clean_line.split(kw)[0])
-            total_spots += len(nums) * 20
-            return total_spots * amount
+    line_spots = 0
+    is_r = any(x in clean_line for x in ['r', 'အာ'])
 
-    # ၂။ ပတ်သီး / အပါ / ပါ / Ch / P (၁၉ ကွက်တွက်နည်း)
-    p_kws = ['ပတ်', 'အပါ', 'ပါ', 'ch', 'p']
-    for kw in p_kws:
-        if kw in clean_line:
-            nums = re.findall(r'\d', clean_line.split(kw)[0])
-            total_spots += len(nums) * 19
-            return total_spots * amount
+    # --- Logic များ စစ်ဆေးခြင်း ---
+    
+    # ၁။ ပါဝါ၊ ညီကို၊ အပူးစုံ၊ ဆယ်ပြည့်၊ နက္ခတ်၊ စုံမဘရိတ် (Multi-Keyword Support)
+    if any(x in clean_line for x in ['ပါဝါ', 'pw', 'power']): line_spots += 10
+    if any(x in clean_line for x in ['ညီကို', 'ညီအကို', 'ညီအစ်ကို']): line_spots += 20
+    if any(x in clean_line for x in ['နက္ခတ်', 'nk', 'နက', 'နခ', 'နတ်']): line_spots += 10
+    if any(x in clean_line for x in ['ဆယ်ပြည့်', 'ဆယ်ပြည်']): line_spots += 10
+    if any(x in clean_line for x in ['အပူးစုံ', 'အပူး', 'ပူး']) and 'ခွေ' not in clean_line: line_spots += 10
+    if any(x in clean_line for x in ['စုံဘရိတ်', 'စုံbk', 'မbk', 'မဘရိတ်', 'စဘရိတ်']): line_spots += 50
 
-    # ၃။ ထိပ် / Top / T (၁၀ ကွက်)
-    if any(x in clean_line for x in ['ထိပ်', 'top', 't']):
-        nums = re.findall(r'\d', clean_line.split('ထ')[0] if 'ထ' in clean_line else clean_line)
-        total_spots += len(nums) * 10
-        return total_spots * amount
+    # ၂။ ပတ်သီး (19 ကွက်) / ပတ်ပူး (20 ကွက်)
+    digits = re.findall(r'\b\d\b', clean_line) # ဂဏန်းတစ်လုံးချင်းစီကို ရှာ
+    if any(x in clean_line for x in ['ပတ်ပူး', 'ပူးပို', 'ထိပ်နောက်']):
+        line_spots += len(digits) * 20
+    elif any(x in clean_line for x in ['ပတ်', 'အပါ', 'ပါ']):
+        line_spots += len(digits) * 19
 
-    # ၄။ ပိတ် / အပိတ် / နောက် / န / ပ (၁၀ ကွက်)
-    if any(x in clean_line for x in ['ပိတ်', 'အပိတ်', 'နောက်', 'န', 'ပ']):
-        nums = re.findall(r'\d', clean_line.split('ပ')[0] if 'ပ' in clean_line else clean_line)
-        total_spots += len(nums) * 10
-        return total_spots * amount
+    # ၃။ ထိပ်စီး / အပိတ် / ဘရိတ် (10 ကွက်)
+    elif any(x in clean_line for x in ['ထိပ်', 'ပိတ်', 'နောက်', 'ဘရိတ်', 'bk']):
+        line_spots += (len(digits) if digits else len(re.findall(r'\d{2}', clean_line))) * 10
 
-    # ၅။ ဘရိတ် / Bk (၁၀ ကွက်)
-    if any(x in clean_line for x in ['ဘရိတ်', 'bk']):
-        nums = re.findall(r'\d', clean_line.split('ဘ')[0] if 'ဘ' in clean_line else clean_line)
-        total_spots += len(nums) * 10
-        return total_spots * amount
-
-    # ၆။ ခွေ (n * n-1) နှင့် ခွေပူး (n * n)
-    if 'ခွေ' in clean_line or 'ခ' in clean_line:
-        match = re.search(r'(\d+)', clean_line)
-        if match:
-            n = len(match.group(1))
+    # ၄။ ခွေ (n*n-1) နှင့် ခွေပူး (n*n)
+    elif 'ခွေ' in clean_line or 'ခ' in clean_line:
+        nums = re.search(r'(\d+)', clean_line)
+        if nums:
+            n = len(nums.group(1))
             if any(x in clean_line for x in ['ပူး', 'အပူးပါ', 'အပြီးပါ']):
-                total_spots += (n * n)
+                line_spots += (n * n)
             else:
-                total_spots += (n * (n - 1))
-        return total_spots * amount
+                line_spots += (n * (n - 1))
 
-    # ၇။ အထူး Keywords (စုံမ၊ ပါဝါ၊ နက္ခတ်၊ ညီကို)
-    if any(x in clean_line for x in ['ပါဝါ', 'ပဝ', 'pw', 'power']): total_spots += 10
-    if any(x in clean_line for x in ['နက္ခတ်', 'nk', 'နက', 'နခ']): total_spots += 10
-    if any(x in clean_line for x in ['ညီကို', 'ညီအကို', 'ညီအစ်ကို']): total_spots += 20
-    if any(x in clean_line for x in ['ဆယ်ပြည့်', 'ဆယ်ပြည်', 'ဆယ့်ပြည်']): total_spots += 10
-    if any(x in clean_line for x in ['အပူးစုံ', 'အပူး', 'ပူး']):
-        if 'စုံပူး' in clean_line or 'မပူး' in clean_line: total_spots += 5
-        else: total_spots += 10
-    if any(x in clean_line for x in ['စစ', 'မမ', 'စမ', 'မစ', 'စုံစုံ', 'စုံမ']): total_spots += 25
-    if any(x in clean_line for x in ['စုံဘရိတ်', 'စုံbk', 'မbk', 'မဘရိတ်']): total_spots += 50
-    
-    # ၈။ ကပ် / ကို (n * n)
-    if 'ကပ်' in clean_line or 'ကို' in clean_line:
+    # ၅။ စစ / မမ / စမ / မစ (25 ကွက်)
+    elif any(x in clean_line for x in ['စစ', 'မမ', 'စမ', 'မစ', 'စုံစုံ', 'စုံမ']):
+        line_spots += 50 if is_r else 25
+
+    # ၆။ ကပ် / ကို (n1 * n2)
+    elif any(x in clean_line for x in ['ကပ်', 'ကို']):
         parts = re.findall(r'(\d+)', clean_line)
         if len(parts) >= 2:
-            res = len(parts[0]) * len(parts[1])
-            if 'r' in clean_line: return (res * 2) * amount
-            return res * amount
+            base = len(parts[0]) * len(parts[1])
+            line_spots += base * (2 if is_r else 1)
 
-    # ၉။ ဒဲ့ဂဏန်းများ နှင့် R Logic (ဥပမာ- 12 34 R500)
-    digits = re.findall(r'\b\d{2}\b', clean_line)
-    if digits:
-        if 'r' in clean_line or 'အာ' in clean_line:
-            # ဒဲ့ + R ခွဲတွက်တာ (500R250) ရှိမရှိ စစ်သည်
-            r_split = clean_line.split('r')
-            if len(r_split) > 1 and re.search(r'\d', r_split[1]):
-                main_amt = extract_amount(r_split[0]) or amount
-                r_amt = extract_amount(r_split[1])
-                return (len(digits) * main_amt) + (len(digits) * r_amt)
-            else:
-                return (len(digits) * 2) * amount
-        else:
-            return len(digits) * amount
+    # ၇။ ဒဲ့ဂဏန်းများ (12 34 56)
+    else:
+        two_digits = re.findall(r'\b\d{2}\b', clean_line)
+        if two_digits:
+            # 500R250 Special Case
+            if 'r' in line:
+                r_match = re.search(r'r(\d+)$', line)
+                if r_match:
+                    r_amt = int(r_match.group(1))
+                    return (len(two_digits) * amount) + (len(two_digits) * r_amt)
+            line_spots += len(two_digits) * (2 if is_r else 1)
 
-    return total_spots * (2 * amount if 'r' in clean_line else amount)
+    return line_spots * amount
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text: return
     
-    original_text = update.message.text
+    text = update.message.text
     user = update.message.from_user
     username = f"@{user.username}" if user.username else user.first_name
     
-    # ၁။ နာမည်ရှာပြီး ဖယ်ထုတ်သည်
-    name_2d, name_kws = get_2d_name(original_text)
-    temp_text = original_text.lower()
-    for kw in name_kws:
-        temp_text = temp_text.replace(kw, "")
+    name_2d, name_kws = get_2d_name(text)
+    lines = text.strip().split('\n')
     
-    lines = temp_text.strip().split('\n')
-    
-    # ၂။ Default Amount ကို အောက်ဆုံးစာကြောင်းမှ ယူသည်
+    # ၁။ Default Amount နှင့် % ရှာခြင်း
     default_amount = 0
-    for line in reversed(lines):
+    comm_percent = 0
+    for line in lines:
         amt = extract_amount(line)
-        if amt:
-            default_amount = amt
-            break
-            
-    # ၃။ တစ်ကြောင်းချင်းတွက်ချက်သည်
+        if amt and not default_amount: default_amount = amt
+        if '%' in line:
+            perc_match = re.search(r'(\d+)\s*%', line)
+            if perc_match: comm_percent = int(perc_match[1])
+
+    # ၂။ တွက်ချက်ခြင်း
     grand_total = 0
     for line in lines:
-        if line.strip():
-            grand_total += calculate_line_logic(line, default_amount)
+        grand_total += calculate_line_logic(line, default_amount)
     
     if grand_total > 0:
+        comm_amount = (grand_total * comm_percent) // 100
+        net_total = grand_total - comm_amount
+        
         response = f"👤 {username}\n"
         response += "--------------------\n"
-        response += f"{name_2d} စုစုပေါင်း = {grand_total:,} ကျပ်\n"
-        response += "ကံကောင်းပါစေရှင့်"
+        response += f"💰 စုစုပေါင်း = {grand_total:,} ကျပ်\n"
+        if comm_percent > 0:
+            response += f"📉 ကော်မရှင် ({comm_percent}%) = {comm_amount:,} ကျပ်\n"
+            response += f"✅ လက်ကျန် = {net_total:,} ကျပ်\n"
+        response += "--------------------\n"
+        response += f"🍀 {name_2d} ကံကောင်းပါစေရှင့်"
         await update.message.reply_text(response)
 
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    print("Bot is running...")
     app.run_polling()
     
