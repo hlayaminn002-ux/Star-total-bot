@@ -3,7 +3,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
 # --- CONFIGURATION ---
-TOKEN = "YOUR_BOT_TOKEN_HERE" # လူကြီးမင်း၏ Token ထည့်ပါ
+TOKEN = "8543212797:AAFMPikuXIga7d3YvpL8avOA8XkTk0C4S0o" # လူကြီးမင်း၏ Token ထည့်ပါ
 
 def get_2d_name(text):
     names = {
